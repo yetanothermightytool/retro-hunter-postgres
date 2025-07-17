@@ -9,7 +9,7 @@ RUN apt-get update && \
    rm -rf /var/lib/apt/lists/*
 COPY requirements.txt ./
 COPY app.py ./
-COPY certs ./certs/
+# COPY certs ./certs/
 RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 8501
 CMD ["streamlit", "run", "app.py", \
