@@ -1,8 +1,7 @@
 rule malw_eicar  {
 
         meta:
-
-                description = "Rule to detect the EICAR pattern"
+        description = "Rule to detect the EICAR pattern"
         author = "Marc Rivero | McAfee ATR Team"
         reference = "https://www.eicar.org/"
         rule_version = "v1"
