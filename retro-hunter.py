@@ -15,7 +15,7 @@ from dateutil import parser as dtparser
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # Script variables
-api_url      = "https://172.25.186.210:9419"
+api_url      = "https://__REPLACE_VBR_SERVER__:9419"
 api_version  = "1.2-rev1"
 mnt_base     = "/mnt"
 results_dir  = "/tmp/output"
@@ -187,6 +187,23 @@ def run_evtscan(mount_path, host2scan, rp_id, rp_ts, rp_status, days=None, evtlo
        print(f"[{host2scan}] 📜 Parsing {logname} from mount {mount_path}")
        subprocess.run(cmd)
 
+# Def Registry Scan
+def run_regscan(mount_path, host2scan, rp_id, rp_ts, rp_status):
+    store_script = "./registry-scan.py"
+    if not os.path.exists(store_script):
+        print("❌ registry-scan.py not found.")
+        return
+    cmd = [
+        "python3", store_script,
+        "--mount", str( mount_path),
+        "--hostname", str(host2scan),
+        "--restorepoint-id", str(rp_id),
+        "--rp-timestamp", str(rp_ts),
+        "--rp-status", str(rp_status),
+    ]
+    print(f"[{host2scan}] 💾 getting Windows Registry keys from mount {mount_path}")
+    subprocess.run(cmd)
+
 # Run iSCSI Scan
 def run_iscsi_scan(mount_id, session_info, host2scan, workers, yaramode, args, rp_id, rp_ts, rp_status, db_path, csv_path=None):
     before = subprocess.check_output("lsblk -nd -o NAME", shell=True).decode().splitlines()
@@ -230,6 +247,8 @@ def run_iscsi_scan(mount_id, session_info, host2scan, workers, yaramode, args, r
             run_store(mnt_path, host2scan, rp_id, rp_ts, rp_status)
         if args.evtscan:
            run_evtscan(mnt_path, host2scan, rp_id, rp_ts, rp_status, args.days, args.evtlogs)
+        if args.regscan:
+           run_regscan(mnt_path, host2scan, rp_id, rp_ts, rp_status)
     time.sleep(10)
 
     print(f"[{host2scan}] 🧹 Cleaning up...")
@@ -315,6 +334,9 @@ def do_mount_scan(token, scanhost, local_ip, rp_id, hostname, use_iscsi, workers
                    run_evtscan(path, hostname, rp_id, rp_ts, rp_status, args.days, args.evtlogs)
            #else:
                #print(f"[{hostname}] ⚠️ Skipping EVTX scan – no Security.evtx at {evtx_file}")
+           if args.regscan:
+              run_regscan(mnt_path, host2scan, rp_id, rp_ts, rp_status)
+
     time.sleep(10)
     print(f"[{hostname}] 🛑 Unpublishing...")
     time.sleep(3)
@@ -334,11 +356,12 @@ def main():
     parser.add_argument("--store", action="store_true", help="Run store.py after mount")
     parser.add_argument("--csv", help="Save results to CSV file (optional)")
     parser.add_argument("--evtscan", action="store_true", help="Run event-parser.py after mount")
+    parser.add_argument("--regscan", action="store_true", help="Run registry-scan.py after mount")
     parser.add_argument("--evtlogs", help="Comma-separated lost of EVTX log files to scan")
     parser.add_argument("--days", type=int, help="Optional: Limit EVTX parsing to events within N days before restore point")
     args = parser.parse_args()
 
-    username = "Administrator"
+    username = "__REPLACE_REST_API_USER__"
     password = get_password()
 
     print("🐻 Get Bearer Token....")
