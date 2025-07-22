@@ -318,6 +318,27 @@ WHERE entropy > 7.5 AND suspicious_structure = 'yes'
 ORDER BY entropy DESC
 LIMIT 100
 """)
+run_analysis_query("🧬 Suspicious IFEO Debuggers (Registry Scan)", """
+SELECT hostname AS Host, key_path AS "Key Path", value_name as "Value Name", value_data AS "Value Data", rp_timestamp AS "RP Timestamp"
+FROM registry_scan
+WHERE key_path LIKE '%%Image File Execution Options%%'
+AND value_name = 'Debugger'
+AND (
+    value_data LIKE '%%cmd.exe%%' OR
+    value_data LIKE '%%powershell.exe%%' OR
+    value_data LIKE '%%wscript.exe%%' OR
+    value_data LIKE '%%cscript.exe%%' OR
+    value_data LIKE '%%\\Users\\%%' OR
+    value_data LIKE '%%\\Temp\\%%' OR
+    value_data LIKE '%%\\AppData\\%%' OR
+    value_data LIKE '%%rat.exe%%' OR
+    value_data LIKE '%%payload%%' OR
+    value_data LIKE '%%\\Tasks\\%%' OR
+    value_data LIKE '%%\\explorer.exe%%' OR
+    value_data LIKE '%%\\svchost.exe%%'
+    )
+LIMIT 100
+""")
 
 # PE Timestamp: Ensure correct datetime handling
 filtered["pe_timestamp"] = pd.to_datetime(filtered["pe_timestamp"], errors='coerce').dt.tz_localize(None)
@@ -397,5 +418,5 @@ else:
 # Footer
 st.markdown("---")
 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.caption(f"🕵🏾‍♀️ Retro Hunter – powered by Veeam Data Integration API ({now}) - Version 2.0 PostgreSQL")
+st.caption(f"🕵🏾‍♀️ Retro Hunter – powered by Veeam Data Integration API ({now}) - Version 2.1 PostgreSQL")
 st.caption("🤖 Some logic and optimizations were assisted using AI tools.")
