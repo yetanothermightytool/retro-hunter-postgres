@@ -232,7 +232,12 @@ col3.metric("🔬 YARA Matches", yara_scan)
 col4.metric("📂 Total Files", len(filtered))
 
 # Suspicious Table - Those are coming from the store.py script
-st.markdown("### 🐞 Suspicious Files")
+st.markdown("### 🐞 Malware Hash Matches")
+comparison_count = len(malware_df)
+st.markdown(
+   f"<div style='font-size: 0.85em; color: gray;'>Compared against {comparison_count:,} known malware hashes</div>",
+   unsafe_allow_html=True
+)
 if not suspicious.empty:
    suspicious_view = suspicious.rename(columns={
        "hostname": "Host", "filename": "Filename", "path": "Path", "sha256": "SHA-256",
