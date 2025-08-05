@@ -22,6 +22,8 @@ Retro Hunter is a lightweight Python-based toolkit that scans Veeam Backup & Rep
 - Detects known malware using hash lookups from MalwareBazaar
 - Identifies out-of-place LOLBAS (Living Off the Land Binaries and Scripts)
 - Optionally applies YARA rules to selected file types during scan
+- Optionally scans the Windows Eventlog for specific event-ids (Security/PowerShell)
+- Optionally scans specific Windows Registry Hives
 - Displays findings in a Streamlit dashboard
 - Uses PostgreSQL as the database
 
@@ -42,12 +44,12 @@ The setup process is simplified with the setup.sh script. You only need to downl
 ```
 
 ## 🐳 Docker Support
-A minimal Docker setup is provided to run the Streamlit dashboard as a container.
+A minimal Docker setup is provided to run the Streamlit dashboard and the PostgreSQL database as a container.
 
 ## 🛠️ Technical Details of the Scripts
 ## Version Information
 ~~~~
-Version: 2.1 (July 23 2025)
+Version: 2.1 (Aug 5 2025)
 Requires: Veeam Backup & Replication v12.3.1 & Linux & Python 3.1+
 Author: Stephan "Steve" Herzig
 ~~~~
@@ -75,7 +77,7 @@ Save additional YARA rule files in the script folder directory yara_rules. (File
 The Streamlit Dashboard includes a YARA rule generator that creates rules based on stored executables with high entropy and PE metadata.
 
 ## Database Content
-The malwarebazaar table in badfiles.db contains the SHA256 values of the malware files. Download the complete [data dump](https://bazaar.abuse.ch/export/#csv) and unzip the CSV file as malwarebazaar.csv to the folder where the script.sh resides. The setup.sh script will import the values into the database.
+The malwarebazaar table in badfiles.db contains the SHA256 values of the malware files. Download the complete [data dump](https://bazaar.abuse.ch/export/#csv) and unzip the CSV file as malwarebazaar.csv to the folder where the setup.sh script is stored. The setup.sh script will import the values into the database.
 
 ## Retro Hunter Python Script
 ### Script Parameters
@@ -150,7 +152,7 @@ sudo ./retro-hunter.py --repo2scan "Repository 01" --yaramode suspicious --iscsi
 | 🧬 High-Entropy Executables with Recent PE Timestamps | Executable files with high entropy (>= 7.59) and suspicious Portable Executable attributes|
 
 ## The Scripts
-### Scanning Process Details
+### Scanning Process Details (scanner.py)
 The following folders are excluded from the scan process. You can adjust the list using the existing DEFAULT_EXCLUDES variable.
 
 - **Windows\\WinSxS**
@@ -259,7 +261,7 @@ This script removes outdated entries from key PostgreSQL tables in your Retro Hu
 • files
 • scan_findings
 • win_events
-• registry (to be documented)
+• registry (to be added)
 
 ### Options
 
@@ -283,9 +285,6 @@ Cleanup only for a specific host
 ./db-cleaner.py --days 30 --host WIN-VM1
 ```
 
-## analyzer.py script
-This script analyzes previously indexed file metadata stored in file_index.db. It compares the data against known malware hashes from badfiles.db and checks for suspicious or changing file patterns across restore points. This helps to detect possible malware infections, tampering, or unusual activity on backup data.
-
 ## Coming Soon
 - MCP Server (Model Context Protocol)
 
@@ -294,12 +293,12 @@ This script analyzes previously indexed file metadata stored in file_index.db. I
 - And a few other nice things that I'm currently researching.
 
 ## Considerations and Limitations
-- The scripts have been created and tested on Ubuntu 24.04.
-- Only filesystems with the NTFS, ext4, and XFS filesystems can be scanned when presenting the restore points using iSCSI
+- The scripts have been created and tested on Ubuntu 24.04 and Veeam Backup & Replication 12.3.1 and 12.3.2
+- Only filesystems with the NTFS can be scanned when presenting the restore points using iSCSI
 - When mounting NTFS disks, it’s important to know that Ubuntu (from version 24.04 and newer) uses the built-in ntfs3 kernel driver, which provides better performance and more stable access. In contrast, Rocky Linux and other RHEL-based systems usually rely on the older ntfs-3g driver through FUSE, which is slower because it runs in user space. This means that the way NTFS is handled can vary depending on the system. It is technically possible to upgrade Rocky Linux to a newer Kernel (5.15 or higher) to support the native ntfs3 driver. Mounting NTFS volumes works well when using the -t ntfs parameter, especially with iSCSI attached disks. FUSE is not working and there are currently no efforts to conduct further research in this area.
 
 ## Version History
-- 2.1 (July 23rd 2025)
+- 2.1 (August 5th 2025)
    - Windows Registry Scanner
 - 2.0 (July 18th 2025)
    - PostgreSQL as a database.
