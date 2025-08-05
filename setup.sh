@@ -119,6 +119,10 @@ sed -i "s|__REPLACE_VBR_SERVER__|$VBR_SERVER|g" retro-hunter.py
 sed -i "s|__REPLACE_REST_API_USER__|$REST_USER|g" retro-hunter.py
 echo "✅ Patched retro-hunter.py"
 
+# Make retro-hunter.py executable
+chmod +x retro-hunter.py
+echo "🎸 retro-hunter.py ready to rock!"
+
 # CREATE FERNET FILES
 echo "🔐 Generating Fernet key files..."
 cp fernet/create-fernet-files.py . || { echo "❌ Missing create-fernet-files.py"; exit 1; }
