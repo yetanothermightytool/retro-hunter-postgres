@@ -335,7 +335,7 @@ def do_mount_scan(token, scanhost, local_ip, rp_id, hostname, use_iscsi, workers
            #else:
                #print(f"[{hostname}] ⚠️ Skipping EVTX scan – no Security.evtx at {evtx_file}")
            if args.regscan:
-              run_regscan(mnt_path, host2scan, rp_id, rp_ts, rp_status)
+              run_regscan(path, hostname, rp_id, rp_ts, rp_status)
 
     time.sleep(10)
     print(f"[{hostname}] 🛑 Unpublishing...")
