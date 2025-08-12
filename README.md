@@ -89,7 +89,7 @@ Hostname for which the backups must be presented.
 Repository name for which the hosts and restore points are retreved. Can be combined with --all.
 - `--all`
 _(optional)_ Scans the latest restore point of all valid hosts in the specified repository. Recommended to use with --iscsi for better performance.
-Supported platforms are VMware, Hyper-V, Windows Agent, Linux Agent.
+Supported platforms are VMware and Hyper-V.
 - `--scan`
 Triggers the malware and threat detection scan by executing the scanner.py script after a restore point has been mounted.
 - `--store`
@@ -298,6 +298,10 @@ Cleanup only for a specific host
 - When mounting NTFS disks, it’s important to know that Ubuntu (from version 24.04 and newer) uses the built-in ntfs3 kernel driver, which provides better performance and more stable access. In contrast, Rocky Linux and other RHEL-based systems usually rely on the older ntfs-3g driver through FUSE, which is slower because it runs in user space. This means that the way NTFS is handled can vary depending on the system. It is technically possible to upgrade Rocky Linux to a newer Kernel (5.15 or higher) to support the native ntfs3 driver. Mounting NTFS volumes works well when using the -t ntfs parameter, especially with iSCSI attached disks. FUSE is not working and there are currently no efforts to conduct further research in this area.
 
 ## Version History
+- 2.2 ( )
+   -
+   -
+   -
 - 2.1 (August 5th 2025)
    - Windows Registry Scanner
 - 2.0 (July 18th 2025)
