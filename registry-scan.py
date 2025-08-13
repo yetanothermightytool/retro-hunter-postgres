@@ -12,35 +12,93 @@ load_dotenv(dotenv_path=".env.local")
 # Registry key patterns to be scanned
 KEY_PATTERNS = [
    # ---------------------- Code Injection / Execution Hijacking ----------------------
-   r".*\\AppCertDlls$", r".*\\AppInit_DLLs$", r".*\\LoadAppInit_DLLs$", r".*\\KnownDlls$",
-   r".*\\Image File Execution Options\\.*", r".*\\SilentProcessExit\\.*",
+   r".*\\AppCertDlls$",
+   r".*\\AppInit_DLLs$",
+   r".*\\LoadAppInit_DLLs$",
+   r".*\\KnownDlls$",
+   r".*\\Image File Execution Options\\.*",
+   r".*\\SilentProcessExit\\.*",
    r".*\\Session Manager\\KnownDLLs$",
 
    # ---------------------- Admin, Hacker & Red Team Tools ----------------------
-   r".*\\Software\\Sysinternals\\.*", r".*\\Software\\ProcessHacker\\.*",
-   r".*\\Software\\NirSoft\\.*", r".*\\Software\\Microsoft\\Windbg\\.*",
+   r".*\\Software\\Sysinternals\\.*",
+   r".*\\Software\\ProcessHacker\\.*",
+   r".*\\Software\\NirSoft\\.*",
+   r".*\\Software\\Microsoft\\Windbg\\.*",
    r".*\\Software\\OllyDbg\\.*",
 
    # ---------------------- Known Malware / Threat Actor Artefacts ----------------------
-   r".*\\Explorer\\Advanced\\Hidden$", r".*\\Software\\Classes\\mscfile\\shell\\open\\command$",
-   r".*\\Control\\SafeBoot\\.*", r".*\\Microsoft\\Windows\\CurrentVersion\\ShellCompatibility\\InboxApp$",
-   r".*\\Software\\Classes\\.msc\\.*", r".*\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell$",
+   r".*\\Explorer\\Advanced\\Hidden$",
+   r".*\\Software\\Classes\\mscfile\\shell\\open\\command$",
+   r".*\\Control\\SafeBoot\\.*",
+   r".*\\Microsoft\\Windows\\CurrentVersion\\ShellCompatibility\\InboxApp$",
+   r".*\\Software\\Classes\\.msc\\.*",
+   r".*\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell$",
 
-   # ---------------------- Execution / Autostart / Persistence ----------------------
-   r".*\\Run$", r".*\\RunOnce$", r".*\\Policies\\Microsoft\\Windows\\System$",
-   r".*\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Run$",
-   r".*\\Active Setup\\Installed Components\\.*", r".*\\Winlogon\\Userinit$",
-   r".*\\Winlogon\\Shell$", r".*\\Session Manager\\PendingFileRenameOperations$",
-   r".*\\Shell\\Open\\Command$", r".*\\Control\\Session Manager\\BootExecute$",
+   # ---------------------- ASEPs: Per-user ----------------------
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx$",
+   r".*\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Run$",
+   r".*\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce$",
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows\\(Load|Run)$",
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\Shell$",
+   # Terminal Server Install (per-user context)
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\Run$",
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce$",
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunonceEx$",
+
+   # ---------------------- ASEPs: System-wide ----------------------
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\Run$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx$",
+   r".*\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Run$",
+   r".*\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce$",
+   r".*\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx$",
+   # Terminal Server Install (system-wide context)
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\Run$",
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce$",
+   r".*\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Terminal Server\\Install\\Software\\Microsoft\\Windows\\CurrentVersion\\RunonceEx$",
+   # Group Policy controlled Run
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\Run$",
+
+   # ---------------------- RunServices (service startup at boot) ----------------------
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce$",
+   # Optional: 32-bit view under Wow6432Node
+   r".*\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunServices$",
+   r".*\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce$",
+
+   # ---------------------- Boot Execute / Session Manager (additional keys) ----------------------
+   r".*\\System\\CurrentControlSet\\Control\\Session Manager\\BootExecute$",
+   r".*\\System\\CurrentControlSet\\Control\\Session Manager\\Execute$",
+   r".*\\System\\CurrentControlSet\\Control\\Session Manager\\S0InitialCommand$",
+   r".*\\System\\CurrentControlSet\\Control\\Session Manager\\SetupExecute$",
+   r".*\\System\\CurrentControlSet\\Control\\ServiceControlManagerExtension$",
+   r".*\\Winlogon\\Userinit$",
+   r".*\\Winlogon\\Shell$",
+   r".*\\Session Manager\\PendingFileRenameOperations$",
+   r".*\\Control\\Session Manager\\BootExecute$",
+
+   # ---------------------- Startup folder path resolution in Registry ----------------------
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders$",
+   r".*\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders$",
 
    # ---------------------- Network / Remote Access Artefacts ----------------------
-   r".*\\Microsoft\\Terminal Server Client\\Servers\\.*", r".*\\Network\\Connections\\Pbk$",
-   r".*\\Internet Settings$", r".*\\Tcpip\\Parameters\\Interfaces\\.*",
+   r".*\\Microsoft\\Terminal Server Client\\Servers\\.*",
+   r".*\\Network\\Connections\\Pbk$",
+   r".*\\Internet Settings$",
+   r".*\\Tcpip\\Parameters\\Interfaces\\.*",
    r".*\\NetworkList\\Profiles\\.*",
 
    # ---------------------- User Activity / Forensic Artefacts ----------------------
-   r".*\\UserAssist\\.*", r".*\\Explorer\\RecentDocs$", r".*\\TypedPaths$",
-   r".*\\TypedURLs$", r".*\\ComDlg32\\LastVisitedPidlMRU$",
+   r".*\\UserAssist\\.*",
+   r".*\\Explorer\\RecentDocs$",
+   r".*\\TypedPaths$",
+   r".*\\TypedURLs$",
+   r".*\\ComDlg32\\LastVisitedPidlMRU$",
    r".*\\Windows\\CurrentVersion\\Explorer\\RunMRU$",
    r".*\\Windows\\PowerShell\\.*\\ConsoleHost_history$",
 
@@ -48,10 +106,12 @@ KEY_PATTERNS = [
    r".*\\Services\\.*",
 
    # ---------------------- Defensive Evasion / Security Config ----------------------
-   r".*\\Windows Defender\\.*", r".*\\AeDebug$",
+   r".*\\Windows Defender\\.*",
+   r".*\\AeDebug$",
 
    # ---------------------- Miscellaneous ----------------------
-   r".*\\MountPoints2\\.*", r".*\\Windows\\CurrentVersion\\Uninstall\\.*",
+   r".*\\MountPoints2\\.*",
+   r".*\\Windows\\CurrentVersion\\Uninstall\\.*",
 ]
 
 # Registry hives to scan
