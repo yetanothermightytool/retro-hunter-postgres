@@ -100,7 +100,6 @@ until sudo docker exec $(sudo docker compose ps -q db) pg_isready -U "$PG_USER" 
 done
 echo "✅ PostgreSQL is running."
 
-
 # Import DB files
 echo "🦠 Importing MalwareBazaar and LOLBAS data..."
 python3 import_lolbas.py || { echo "❌ LOLBAS import failed"; exit 1; }
@@ -121,7 +120,10 @@ echo "✅ Patched retro-hunter.py"
 
 # Make retro-hunter.py executable
 chmod +x retro-hunter.py
-echo "🎸 retro-hunter.py ready to rock!"
+chmod +x registry-analyzer.py
+chmod +x import_malwarebazaar.py
+chmod +x db-cleaner.py
+echo "🎸 retro-hunter.py & tools are ready to rock!"
 
 # CREATE FERNET FILES
 echo "🔐 Generating Fernet key files..."
