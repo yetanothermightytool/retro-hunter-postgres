@@ -11,7 +11,12 @@ load_dotenv(dotenv_path=".env.local")
 
 # Important Windows Event IDs
 DEFAULT_EVENT_IDS = [4618, 4649, 4719, 4765, 4766, 4794, 4897, 4964, 5124, 1102]
-POWERSHELL_EVENT_IDS = [800, 4104]
+# Extended: High-volume or optional events for deeper analysis
+# - 4688 / 4689 Process creation / termination
+# - 4104       PowerShell ScriptBlock logging (requires Script-Block Logging enabled)
+# - 8004 / 8007→ AppLocker Script Enforcement/Audit
+EXTENDED_EVENT_IDS = [4688, 4689,8004,8007]
+POWERSHELL_EVENT_IDS = [4104,800]
 
 def parse_args():
    parser = argparse.ArgumentParser(description="Parse Windows EVTX logs into PostgreSQL")
@@ -25,6 +30,7 @@ def parse_args():
    parser.add_argument("--days", type=int)
    parser.add_argument("--limit", type=int)
    parser.add_argument("--verbose", action="store_true")
+   parser.add_argument("--extended", action="store_true",help="Include extended event IDs in addition to default IDs")
    return parser.parse_args()
 
 def init_table(cur):
@@ -117,51 +123,56 @@ def store_events(cur, events):
    return inserted
 
 def main():
-   args = parse_args()
+ args = parse_args()
 
-   conn = psycopg2.connect(
-       host=os.getenv("POSTGRES_HOST", "localhost"),
-       port=os.getenv("POSTGRES_PORT", 5432),
-       user=os.getenv("POSTGRES_USER"),
-       password=os.getenv("POSTGRES_PASSWORD"),
-       dbname=os.getenv("POSTGRES_DB")
+ conn = psycopg2.connect(
+   host=os.getenv("POSTGRES_HOST", "localhost"),
+   port=os.getenv("POSTGRES_PORT", 5432),
+   user=os.getenv("POSTGRES_USER"),
+   password=os.getenv("POSTGRES_PASSWORD"),
+   dbname=os.getenv("POSTGRES_DB")
+ )
+ cur = conn.cursor()
+ init_table(cur)
+
+ logfiles = [l.strip() for l in args.logfile.split(",") if l.strip()]
+ all_events = []
+
+ for logfile in logfiles:
+   evtx_path = os.path.join(args.mount, "Windows", "System32", "winevt", "Logs", logfile)
+   if not os.path.isfile(evtx_path):
+     print(f"❌ EVTX not found: {evtx_path}")
+     continue
+
+   if "PowerShell" in logfile:
+     used_ids = POWERSHELL_EVENT_IDS
+   else:
+     if args.event_ids:
+       used_ids = [int(e.strip()) for e in args.event_ids.split(",")]
+     elif args.extended:
+       used_ids = DEFAULT_EVENT_IDS + EXTENDED_EVENT_IDS
+     else:
+       used_ids = DEFAULT_EVENT_IDS
+
+   parsed = parse_evtx(
+     evtx_path,
+     args.hostname,
+     args.restorepoint_id,
+     args.rp_timestamp,
+     args.rp_status,
+     used_ids,
+     args.days,
+     args.limit,
+     args.verbose
    )
-   cur = conn.cursor()
-   init_table(cur)
+   all_events.extend(parsed)
 
-   logfiles = [l.strip() for l in args.logfile.split(",") if l.strip()]
-   all_events = []
+ inserted = store_events(cur, all_events)
+ conn.commit()
+ cur.close()
+ conn.close()
 
-   for logfile in logfiles:
-       evtx_path = os.path.join(args.mount, "Windows", "System32", "winevt", "Logs", logfile)
-       if not os.path.isfile(evtx_path):
-           print(f"❌ EVTX not found: {evtx_path}")
-           continue
-
-       if "PowerShell" in logfile:
-           used_ids = POWERSHELL_EVENT_IDS
-       else:
-           used_ids = [int(e.strip()) for e in args.event_ids.split(",")] if args.event_ids else DEFAULT_EVENT_IDS
-
-       parsed = parse_evtx(
-           evtx_path,
-           args.hostname,
-           args.restorepoint_id,
-           args.rp_timestamp,
-           args.rp_status,
-           used_ids,
-           args.days,
-           args.limit,
-           args.verbose
-       )
-       all_events.extend(parsed)
-
-   inserted = store_events(cur, all_events)
-   conn.commit()
-   cur.close()
-   conn.close()
-
-   print(f"✅ Stored {inserted} events into win_events.")
+ print(f"✅ Stored {inserted} events into win_events.")
 
 if __name__ == "__main__":
-   main()
+ main()
