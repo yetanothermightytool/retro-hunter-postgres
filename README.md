@@ -49,8 +49,8 @@ A minimal Docker setup is provided to run the Streamlit dashboard and the Postgr
 ## 🛠️ Technical Details of the Scripts
 ## Version Information
 ~~~~
-Version: 2.1 (Aug 5 2025)
-Requires: Veeam Backup & Replication v12.3.1 & Linux & Python 3.1+
+Version: 2.2 (Aug 13 2025)
+Requires: Veeam Backup & Replication v12.3.1+ & Linux & Python 3.1+
 Author: Stephan "Steve" Herzig
 ~~~~
 
@@ -63,11 +63,18 @@ Some preparations are required for this script to run.
 
 ### Python Modules
 The following Python modules are not part of the standard library and must be installed separately using pip. A requirements.txt contains the necessary modules.
-- requests
-- cryptography (for cryptography.fernet.Fernet)
-- colorama
-- yara (usually installed via yara-python)
-- python-evtx for Windows Event Log scanning 
+- python3-pip
+- python3-venv
+- python3-evtx
+- python3-yara
+- python3-colorama
+- python3-requests
+- python3-dateutil
+- python3-magic
+- python3-pefile
+- python3-psycopg2
+- python3-dotenv
+- python3-cryptography (for cryptography.fernet.Fernet)
 - and more for the Docker containers (requirements.txt)
 
 ## YARA Rules
@@ -77,7 +84,7 @@ Save additional YARA rule files in the script folder directory yara_rules. (File
 The Streamlit Dashboard includes a YARA rule generator that creates rules based on stored executables with high entropy and PE metadata.
 
 ## Database Content
-The malwarebazaar table in badfiles.db contains the SHA256 values of the malware files. Download the complete [data dump](https://bazaar.abuse.ch/export/#csv) and unzip the CSV file as malwarebazaar.csv to the folder where the setup.sh script is stored. The setup.sh script will import the values into the database.
+The malwarebazaar table in contains the SHA256 values of the malware files. Download the complete [data dump](https://bazaar.abuse.ch/export/#csv) and unzip the CSV file as malwarebazaar.csv to the folder where the setup.sh script is stored. The setup.sh script will import the values into the database.
 
 ## Retro Hunter Python Script
 ### Script Parameters
@@ -109,7 +116,7 @@ _(optional)_ Comma-separated list of EVTX log files to scan
 - `--days`
 _(optional)_ Limit EVTX parsing to events within N days before restore point timestamp
 - `--regscan`
-_(optional)_ Enables scanning of the Windows Registry **🔴 NEW**
+_(optional)_ Enables scanning of the Windows Registry **🔴 ENHANCED**
 
 ### Examples
 Some examples of how the script can be executed.
@@ -124,23 +131,24 @@ sudo ./retro-hunter.py --repo2scan "Repository 01" --yaramode suspicious --iscsi
 ```
 
 ## Retro Hunter Streamlit Dashboard
-✅ Key Metrics (Top 5 KPIs):
+✅ Overview Tab **🔴 NEW ** - Key Metrics (Top 5 KPIs)
 | Metric  | Description |
 | ------------- | ------------- |
 | 🦠 Malware Matches  | Total number of files matching known malware hashes|
 | 🛠️ LOLBAS Hit | Files flagged by LOLBAS rule matches |
 | 🔬 YARA Matches | Files identified via YARA rules |
-| 📂 Total Files | Number of indexed files |
-| 🌀 Multi-use Hashes | SHA256 hashes that appear with multiple filenames (possible masquerading) |
-| 🛑 High Severity Events | Number of critical security-related events (e.g., policy changes, log clears and more) |
-| ⚠️ Medium to High Events | Number of optentially suspicious events requiringfurther review |
+| 🐞 Malware Hash Matches | Displays files from the backup that match known malware hashes (e.g. from MalwareBazaar). Helps identify known threats |
+| 📁 Files per host | Shows how many files were found on each host |
+| 📁 Files over time | Shows how many files were found on each date |
 
+✅ Scans Tab **🔴 NEW **
+| Metric  | Description |
+| ------------- | ------------- |
+| 🔍 Scan Findings | Results from YARA or LOLBAS scans. Includes detection labels, scan timestamps, and affected files |
 
-📊 Table Overview
+📊 Deep Analysis Tab **🔴 NEW **
 | Table  | Description |
 | ------------- | ------------- |
-| 🐞 Malware Hash Matches | Displays files from the backup that match known malware hashes (e.g. from MalwareBazaar). Helps identify known threats |
-| 🔍 Scan Findings | Results from YARA or LOLBAS scans. Includes detection labels, scan timestamps, and affected files |
 | 💣 Large Executables > 50MB | Shows .exe files larger than 50MB, which may indicate suspicious payloads or packers |
 | 📁 Suspicious EXEs in AppData | Lists executables located in AppData folders – commonly abused by malware for persistence or evasion |
 | 📂 Scripts in Temp/Download Directories | Detects script files (e.g., .ps1, .sh, .bat) in temporary or download paths – often used for staging attacks |
@@ -148,8 +156,12 @@ sudo ./retro-hunter.py --repo2scan "Repository 01" --yaramode suspicious --iscsi
 | ⚙️ System Process Names Outside System32 | Known system process names (e.g., svchost.exe, lsass.exe) found outside trusted paths like System32. Strong indicator of abuse or masquerading |
 | 🧬 Suspicious IFEO Debuggers (Registry Scan) | Description coming soon|  **🔴 NEW** |
 | 🧠 High Entropy Files in Suspicious Paths | Identifies files with high entropy (>7.5), indicating possible encryption or obfuscation, located in suspicious directories |
-| 📑 Windows Event Log Entries | Parsed entries from Windows Event Log files (Security & PowerShell) for forensic and threat analysis |
 | 🧬 High-Entropy Executables with Recent PE Timestamps | Executable files with high entropy (>= 7.59) and suspicious Portable Executable attributes|
+
+📊 Events Tab **🔴 NEW **
+| Table  | Description |
+| ------------- | ------------- |
+| 📑 Windows Event Log Entries | Parsed entries from Windows Event Log files (Security & PowerShell) for forensic and threat analysis |
 
 ## The Scripts
 ### Scanning Process Details (scanner.py)
@@ -298,21 +310,24 @@ Cleanup only for a specific host
 - When mounting NTFS disks, it’s important to know that Ubuntu (from version 24.04 and newer) uses the built-in ntfs3 kernel driver, which provides better performance and more stable access. In contrast, Rocky Linux and other RHEL-based systems usually rely on the older ntfs-3g driver through FUSE, which is slower because it runs in user space. This means that the way NTFS is handled can vary depending on the system. It is technically possible to upgrade Rocky Linux to a newer Kernel (5.15 or higher) to support the native ntfs3 driver. Mounting NTFS volumes works well when using the -t ntfs parameter, especially with iSCSI attached disks. FUSE is not working and there are currently no efforts to conduct further research in this area.
 
 ## Version History
-- 2.2 ( )
-   -
-   -
-   -
-- 2.1 (August 5th 2025)
+- 2.2 (August 13 2025)
+   - Streamlit Dashboard cleanup. No error messages when a table does not exist (script did not run)
+   - Streamlit Dashboard now has tabs for a better UI experience (tested on Streamlit 1.48.0)
+   - DB clean-up script (db-cleaner.py)
+   - registry-scan.py script improvements. Added additional keys
+   - event-parser.py script now scans for extended event ids (EXTENDED_EVENT_IDS - Optional)
+   - registry-analyzer.py script for analyzing Windows Registry entries.
+- 2.1 (August 5 2025)
    - Windows Registry Scanner
-- 2.0 (July 18th 2025)
+- 2.0 (July 18 2025)
    - PostgreSQL as a database.
-- 1.3 (July 14th 2025)
+- 1.3 (July 14 2025)
   - The new YARA highentropy mode in scanner.py starts a scan using the stored YARA rules
   - The store.py script extracts file type signatures (Magic) and Portable Executable metadata for high-entropy executable file
   - Store.py script optimizations
   - Streamlit dasboard update to show the High-Entropy Executable files
   - YARA rule generator in the Streamlit dashboard on High-Entropy executable files
-- 1.2 (July 8th 2025)
+- 1.2 (July 8 2025)
   - The scanner.py now also saves the SHA256 value for found LOLBAS files
   - Streamlit Dashboard date filter is now applied to all tables showing the restore point date
   - Streamlit Dashboard bugfixes (empty tables)
