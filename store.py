@@ -11,6 +11,7 @@ import math
 import pefile
 import magic
 from dotenv import load_dotenv
+import time
 
 load_dotenv(dotenv_path=".env.local")
 
@@ -174,7 +175,10 @@ def sha256_file(path):
    h = hashlib.sha256()
    try:
        with open(path, "rb") as f:
-           while chunk := f.read(8192):
+           while True:
+               chunk = f.read(8192)
+               if not chunk:
+                   break
                h.update(chunk)
        return h.hexdigest()
    except:
@@ -215,23 +219,44 @@ def worker(chunk_queue, result_queue, hostname, restorepoint_id, rp_timestamp, r
            chunk = chunk_queue.get(timeout=5)
        except Empty:
            break
-       for file_path in chunk:
-           meta = extract_metadata(file_path)
-           if meta and meta["sha256"]:
-               meta.update({
-                   "hostname": hostname,
-                   "restorepoint_id": restorepoint_id,
-                   "rp_timestamp": rp_timestamp,
-                   "rp_status": rp_status
-               })
-               result_queue.put(meta)
-       chunk_queue.task_done()
+       try:
+           for file_path in chunk:
+               meta = extract_metadata(file_path)
+               if meta and meta["sha256"]:
+                   meta.update({
+                       "hostname": hostname,
+                       "restorepoint_id": restorepoint_id,
+                       "rp_timestamp": rp_timestamp,
+                       "rp_status": rp_status
+                   })
+                   result_queue.put(meta)
+       finally:
+           chunk_queue.task_done()
 
-def write_results(result_queue, conn):
+def db_writer(result_queue, dsn, verbose=False, batch_size=1000):
+   conn = psycopg2.connect(**dsn)
+   init_table(conn)
    cur = conn.cursor()
-   inserted = 0
-   while not result_queue.empty():
-       meta = result_queue.get()
+   inserted_total = 0
+   batch = []
+   while True:
+       item = result_queue.get()
+       if item is None:
+           if batch:
+               _flush_batch(cur, conn, batch)
+               inserted_total += len(batch)
+           if verbose:
+               print(f"🗄️  Writer exiting. Inserted ~{inserted_total} rows.")
+           conn.close()
+           return
+       batch.append(item)
+       if len(batch) >= batch_size:
+           _flush_batch(cur, conn, batch)
+           inserted_total += len(batch)
+           batch.clear()
+
+def _flush_batch(cur, conn, batch):
+   for meta in batch:
        try:
            cur.execute("""
                INSERT INTO files (
@@ -249,38 +274,38 @@ def write_results(result_queue, conn):
                meta["is_executable"], meta["entropy"], meta["suspicious_structure"],
                meta["magic_type"], meta["pe_timestamp"], meta["pe_sections"]
            ))
-           if cur.rowcount:
-               inserted += 1
        except Exception as e:
            print(f"❌ Failed to insert: {e}")
    conn.commit()
-   return inserted
 
 def main():
    args = parse_args()
    filetypes = [ft.strip().lower() for ft in args.filetypes.split(",")] if args.filetypes else DEFAULT_BINARY_EXTS
    excludes = [ex.strip() for ex in args.exclude.split(",")] if args.exclude else []
 
-   conn = psycopg2.connect(
+   dsn = dict(
        host=os.getenv("POSTGRES_HOST", "localhost"),
-       port=os.getenv("POSTGRES_PORT", 5432),
+       port=int(os.getenv("POSTGRES_PORT", 5432)),
        user=os.getenv("POSTGRES_USER"),
        password=os.getenv("POSTGRES_PASSWORD"),
-       dbname=os.getenv("POSTGRES_DB")
+       dbname=os.getenv("POSTGRES_DB"),
    )
-   init_table(conn)
+
+   # Start writer first so result_queue always has a consumer
+   result_queue = multiprocessing.Queue(maxsize=5000)
+   writer = multiprocessing.Process(target=db_writer, args=(result_queue, dsn, args.verbose))
+   writer.start()
 
    print(f"[{args.hostname}] 🔍 Scanning {args.mount}...")
    all_files = get_files(args.mount, filetypes, args.maxsize, excludes)
    total = len(all_files)
    print(f"[{args.hostname}] 📦 {total} matching filters")
-
    if total == 0:
+       result_queue.put(None)
+       writer.join()
        return
 
    chunk_queue = multiprocessing.JoinableQueue()
-   result_queue = multiprocessing.Queue()
-
    for i in range(0, total, CHUNK_SIZE):
        chunk_queue.put(all_files[i:i + CHUNK_SIZE])
 
@@ -293,15 +318,16 @@ def main():
        p.start()
        workers.append(p)
 
+   # Wait until all chunks were processed (task_done called by workers)
    chunk_queue.join()
 
-   if args.verbose:
-       print("📥 Writing to database...")
+   for p in workers:
+       p.join()
 
-   inserted = write_results(result_queue, conn)
-   conn.close()
+   result_queue.put(None)
+   writer.join()
 
-   print(f"[{args.hostname}] ✅ Done. Indexed {inserted} new files into PostgreSQL.")
+   print(f"[{args.hostname}] ✅ Done.")
 
 if __name__ == "__main__":
    main()
