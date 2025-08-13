@@ -27,7 +27,12 @@ DEFAULT_EXCLUDES = [
    "System Volume Information", "Recovery", "Windows\\Logs",
    "Windows\\SoftwareDistribution\\Download", "Windows\\Prefetch",
    "Program Files\\Common Files\\Microsoft Shared",
-   "Windows\\Microsoft.NET\\Framework64", "$Recycle.Bin"
+   "Windows\\Microsoft.NET\\Framework64", "$Recycle.Bin",
+   "appdata\\roaming\\microsoft\\systemcertificates\\my\\appcontainerusercertread",
+   "Windows\\System32\\config\\systemprofile\\appdata\\roaming\\microsoft\\systemcertificates\\my\\appcontainerusercertread",
+   "Windows\\ServiceProfiles\\LocalService\\AppData\\LocalLow\\Microsoft\\CryptnetUrlCache\\Content",
+   "AppData\\LocalLow\\Microsoft\\CryptnetUrlCache\\Content",
+   "AppData\\Local\\Packages\\Microsoft.AAD.BrokerPlugin_cw5n1h2txyewy\\AC\\Microsoft\\CryptnetUrlCache\\Content"
 ]
 
 def parse_args():
@@ -118,11 +123,17 @@ def get_files(root, filetypes, maxsize, excludes):
    normalized_excludes = [ex.lower().replace("/", os.sep).replace("\\", os.sep) for ex in excludes]
    for dirpath, _, files in os.walk(root):
        norm_path = dirpath.lower()
+
        if any(ex in norm_path for ex in normalized_excludes):
            continue
        for name in files:
            path = os.path.join(dirpath, name)
-           if filetypes and not any(path.lower().endswith(ft) for ft in filetypes):
+           norm_full = path.lower()
+
+           if any(ex in norm_full for ex in normalized_excludes):
+               continue
+
+           if filetypes and not any(norm_full.endswith(ft.lower()) for ft in filetypes):
                continue
            if maxsize:
                try:
@@ -137,7 +148,10 @@ def sha256_file(path):
    h = hashlib.sha256()
    try:
        with open(path, "rb") as f:
-           while chunk := f.read(8192):
+           while True:
+               chunk = f.read(8192)
+               if not chunk:
+                   break
                h.update(chunk)
        return h.hexdigest()
    except:
@@ -155,8 +169,10 @@ def load_hashes():
    lolbas_paths = dict((name.lower(), path) for _, name, path in lolbas_entries if path)
    malware_hashes = {sha.lower(): name for sha, name in malware_entries if sha}
    return lolbas_hashes, malware_hashes, lolbas_paths
+
 def normalize(p):
    return os.path.normpath(p).replace("\\", os.sep).lower()
+
 def compile_yara_rules(path="yara_rules"):
    rules = {}
    for f in os.listdir(path):
@@ -170,72 +186,74 @@ def worker(chunk_queue, result_queue, stats_queue, lol_hashes, mw_hashes, lol_pa
            chunk = chunk_queue.get(timeout=5)
        except Empty:
            break
-       for path in chunk:
-           filename = os.path.basename(path)
-           lookup_name = filename.lower()
-           norm_path = normalize(path)
-           file_hash = sha256_file(path)
-           suspicious = False
-           entropy = None
-           if yara_mode == "highentropy":
-               entropy = calculate_entropy(path)
+       try:
+           for path in chunk:
+               filename = os.path.basename(path)
+               lookup_name = filename.lower()
+               norm_path = normalize(path)
+               file_hash = sha256_file(path)
+               suspicious = False
+               entropy = None
+               if yara_mode == "highentropy":
+                   entropy = calculate_entropy(path)
 
-           if lookup_name in lol_paths:
-               expected = normalize(lol_paths[lookup_name])
-               try:
-                   expected_tail = os.path.normcase(expected).split("windows" + os.sep, 1)[-1]
-                   actual_path = os.path.normcase(norm_path)
-                   if expected_tail not in actual_path:
-                       file_hash = file_hash or sha256_file(path)
-                       msg = f"⚠️  LOLBAS OUT OF PLACE: {path} (expected {lol_paths[lookup_name]})"
-                       print(f"\n{Fore.MAGENTA}{Style.BRIGHT}{msg}")
+               if lookup_name in lol_paths:
+                   expected = normalize(lol_paths[lookup_name])
+                   try:
+                       expected_tail = os.path.normcase(expected).split("windows" + os.sep, 1)[-1]
+                       actual_path = os.path.normcase(norm_path)
+                       if expected_tail not in actual_path:
+                           file_hash = file_hash or sha256_file(path)
+                           msg = f"⚠️  LOLBAS OUT OF PLACE: {path} (expected {lol_paths[lookup_name]})"
+                           print(f"\n{Fore.MAGENTA}{Style.BRIGHT}{msg}")
+                           log_message(msg, logfile)
+                           result_queue.put((path, file_hash, "lolbas_out_of_place"))
+                           stats_queue.put("lolbas")
+                           suspicious = True
+                   except Exception as e:
+                       print(f"⚠️ LOLBAS check failed for {path}: {e}")
+
+               if file_hash:
+                   if file_hash in mw_hashes:
+                       msg = f"🐞 MATCH (MalwareBazaar) {path} → {mw_hashes[file_hash]}"
+                       print(f"\n{Fore.RED}{Style.BRIGHT}{msg}")
                        log_message(msg, logfile)
-                       result_queue.put((path, file_hash, "lolbas_out_of_place"))
-                       stats_queue.put("lolbas")
+                       result_queue.put((path, file_hash, mw_hashes[file_hash]))
+                       stats_queue.put("hash")
                        suspicious = True
-               except Exception as e:
-                   print(f"⚠️ LOLBAS check failed for {path}: {e}")
-
-           if file_hash:
-               if file_hash in mw_hashes:
-                   msg = f"🐞 MATCH (MalwareBazaar) {path} → {mw_hashes[file_hash]}"
-                   print(f"\n{Fore.RED}{Style.BRIGHT}{msg}")
-                   log_message(msg, logfile)
-                   result_queue.put((path, file_hash, mw_hashes[file_hash]))
-                   stats_queue.put("hash")
-                   suspicious = True
+                   else:
+                       stats_queue.put("clean")
+                       if verbose:
+                           print(f"\n{Fore.GREEN}✔ CLEAN: {path}")
                else:
-                   stats_queue.put("clean")
-                   if verbose:
-                       print(f"\n{Fore.GREEN}✔ CLEAN: {path}")
-           else:
-               msg = f"⚠️ File not readable: {path}"
-               print(f"\n{Fore.YELLOW}{msg}")
-               log_message(msg, logfile)
-               stats_queue.put("error")
-
-           do_yara = yara_rules and (
-               yara_mode == "all"
-               or (yara_mode == "content" and any(path.lower().endswith(ft) for ft in CONTENT_FILETYPES))
-               or (yara_mode == "suspicious" and suspicious)
-               or (yara_mode == "highentropy" and entropy is not None and entropy >= 7.5)
-           )
-
-           if do_yara:
-               print(f"{Fore.BLUE}🔬 YARA scan on: {path}")
-               try:
-                   matches = yara_rules.match(filepath=path)
-                   for match in matches:
-                       msg = f"❗ YARA MATCH: {path} → {match.rule}"
-                       print(f"\n{Fore.BLUE}{Style.BRIGHT}{msg}")
-                       log_message(msg, logfile)
-                       result_queue.put((path, file_hash, f"YARA: {match.rule}"))
-                       stats_queue.put("yara")
-               except Exception as e:
-                   msg = f"⚠️ YARA scan failed for {path}: {e}"
+                   msg = f"⚠️ File not readable: {path}"
                    print(f"\n{Fore.YELLOW}{msg}")
                    log_message(msg, logfile)
-       chunk_queue.task_done()
+                   stats_queue.put("error")
+
+               do_yara = yara_rules and (
+                   yara_mode == "all"
+                   or (yara_mode == "content" and any(path.lower().endswith(ft) for ft in CONTENT_FILETYPES))
+                   or (yara_mode == "suspicious" and suspicious)
+                   or (yara_mode == "highentropy" and entropy is not None and entropy >= 7.5)
+               )
+
+               if do_yara:
+                   print(f"{Fore.BLUE}🔬 YARA scan on: {path}")
+                   try:
+                       matches = yara_rules.match(filepath=path)
+                       for match in matches:
+                           msg = f"❗ YARA MATCH: {path} → {match.rule}"
+                           print(f"\n{Fore.BLUE}{Style.BRIGHT}{msg}")
+                           log_message(msg, logfile)
+                           result_queue.put((path, file_hash, f"YARA: {match.rule}"))
+                           stats_queue.put("yara")
+                   except Exception as e:
+                       msg = f"⚠️ YARA scan failed for {path}: {e}"
+                       print(f"\n{Fore.YELLOW}{msg}")
+                       log_message(msg, logfile)
+       finally:
+           chunk_queue.task_done()
 
 def monitor(stats_queue, total, stop_flag, result_stats):
    start = time.time()
@@ -261,9 +279,16 @@ def monitor(stats_queue, total, stop_flag, result_stats):
        sys.stdout.flush()
    print()
 
+def collector(result_queue, collected_list, stop_flag):
+   while not stop_flag.is_set() or not result_queue.empty():
+       try:
+           item = result_queue.get(timeout=0.5)
+           collected_list.append(item)
+       except Empty:
+           continue
+
 def main():
    args = parse_args()
-
    init_db()
 
    print(f"{Fore.CYAN}[{args.hostname}] 🔍 Scanning: {args.mount}")
@@ -275,6 +300,7 @@ def main():
 
    filetypes = CONTENT_FILETYPES if args.yara == "content" else (args.filetypes.split(",") if args.filetypes else None)
    excludes = args.exclude.split(",") if args.exclude else DEFAULT_EXCLUDES
+
    all_files = get_files(args.mount, filetypes, args.maxsize, excludes)
    total = len(all_files)
    if total == 0:
@@ -282,19 +308,29 @@ def main():
        return
 
    chunk_queue = multiprocessing.JoinableQueue()
-   result_queue = multiprocessing.Queue()
+   result_queue = multiprocessing.Queue(maxsize=5000)
    stats_queue = multiprocessing.Queue()
-   result_stats = multiprocessing.Manager().dict()
+   manager = multiprocessing.Manager()
+   result_stats = manager.dict()
+   collected = manager.list()
 
    for i in range(0, total, CHUNK_SIZE):
-       chunk_queue.put(all_files[i:i + CHUNK_SIZE])
+       chunk = all_files[i:i + CHUNK_SIZE]
+       chunk_queue.put(chunk)
 
    lol_hashes, mw_hashes, lol_paths = load_hashes()
    yara_rules = compile_yara_rules() if args.yara != "off" else None
+
+   # Start monitor and collector
    stop_flag = multiprocessing.Event()
    monitor_proc = multiprocessing.Process(target=monitor, args=(stats_queue, total, stop_flag, result_stats))
    monitor_proc.start()
 
+   collector_stop = multiprocessing.Event()
+   collector_proc = multiprocessing.Process(target=collector, args=(result_queue, collected, collector_stop))
+   collector_proc.start()
+
+   # Start workers
    workers = []
    for _ in range(args.workers):
        p = multiprocessing.Process(
@@ -304,19 +340,32 @@ def main():
        p.start()
        workers.append(p)
 
+   # Wait until all chunks are processed
    chunk_queue.join()
+   for p in workers:
+       p.join()
+
+   # Stop monitor and collector
    stop_flag.set()
+   collector_stop.set()
    monitor_proc.join()
+   collector_proc.join()
 
-   results = []
-   while not result_queue.empty():
-       results.append(result_queue.get())
+   try:
+       while True:
+           collected.append(result_queue.get_nowait())
+   except Empty:
+       pass
 
+   results = list(collected)
+
+   # Optional CSV export
    if args.csv and results:
        base, ext = os.path.splitext(args.csv)
        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
        final_name = f"{base}_{timestamp}{ext}"
-       os.makedirs(os.path.dirname(final_name), exist_ok=True)
+       out_dir = os.path.dirname(final_name) or "."
+       os.makedirs(out_dir, exist_ok=True)
        with open(final_name, "w", newline="", encoding="utf-8") as f:
            writer = csv.writer(f)
            writer.writerow(["Hostname", "RestorePointID", "RestorePointTime", "RestorePointStatus", "Path", "SHA256", "Detected as"])
@@ -332,6 +381,7 @@ def main():
        inserted = write_findings_to_db(results, args)
        print(f"{Fore.YELLOW}[{args.hostname}] 💾 Inserted {inserted} findings into DB")
 
+   # Summary
    print(f"\n{Fore.GREEN}{Style.BRIGHT}[{args.hostname}] ✅ Scan complete.")
    print(f"{Style.BRIGHT}- Files scanned:       {total}")
    print(f"{Style.BRIGHT}- Malware matches:     {result_stats.get('hash', 0)}")
