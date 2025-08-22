@@ -2,7 +2,7 @@ services:
  db:
    build:
      context: ./postgresql
-   container_name: retrohunter_db
+   container_name: retro-hunter_db
    restart: unless-stopped
    env_file:
      - .env
@@ -26,6 +26,22 @@ services:
      - ./certs:/app/certs
    env_file:
      - .env
+   networks:
+     - retro-net
+   restart: unless-stopped
+
+ mcp-server:
+   build:
+     context: ./mcp_server
+   container_name: retro-hunter-mcp
+   ports:
+     - "8000:8000"
+   volumes:
+     - ./certs:/app/certs
+   env_file:
+     - .env
+   depends_on:
+     - db
    networks:
      - retro-net
    restart: unless-stopped
