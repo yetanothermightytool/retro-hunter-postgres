@@ -26,7 +26,7 @@ def get_kpis():
        cur.execute("""
            SELECT
                (SELECT COUNT(*) FROM files) AS total_files,
-               (SELECT COUNT(*) FROM scan_findings WHERE LOWER(detection) LIKE '%malware%') AS malware_hits,
+               (SELECT COUNT(*) FROM scan_findings WHERE LOWER(detection) LIKE '%malware%') AS malware_scan_hits,
                (SELECT COUNT(*) FROM scan_findings WHERE LOWER(detection) LIKE '%lolbas%') AS lolbas_hits,
                (SELECT COUNT(*) FROM scan_findings WHERE LOWER(detection) LIKE '%yara%') AS yara_hits
        """)
