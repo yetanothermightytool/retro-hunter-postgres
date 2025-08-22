@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
-from mcp_logic import load_tools
+from mcp_logic import load_modules
 import os
 
 app = FastAPI(
@@ -7,9 +7,9 @@ app = FastAPI(
    version="1.0"
 )
 
-# Dynamically load tools from /tools
-load_tools(app)
+# Dynamically load modules from /modules
+load_modules(app)
 
 @app.get("/")
 def healthcheck():
-   return {"status": "Retro Hunter MCP is ready to serve."}
+   return {"status": "Retro Hunter MCP is ready to serve"}
