@@ -300,11 +300,13 @@ Cleanup only for a specific host
 
 ## Coming Soon
 - Many ideas. Possibly make it v13 ready.
+- Download the MalwareBazaar csv using a script.
 
 ## Possible improvements
 - Mark the scanned restore point as infected in Veeam Backup & Replication.
 - And a few other nice things that I'm currently researching.
 - How about Vectordatabase stuff?
+- How about an ISO file with the OS and the setup script?
 
 ## Considerations and Limitations
 - The scripts have been created and tested on Ubuntu 24.04 and Veeam Backup & Replication 12.3.1 and 12.3.2
@@ -320,7 +322,7 @@ There is now a dedicated MCP Server as part of the Retro Hunter platform. The MC
 
 This allows an LLM to answer questions based on real evidence, not just general knowledge or guesses.
 ### API Access
-Once running, the server offers an OpenAPI/Swagger UI at https://<your-mcp-host>:8000/docs
+Once running, the server offers an OpenAPI/Swagger UI at https://your-host:8000/docs
 You can explore and test all endpoints there.
 
 ## Version History
