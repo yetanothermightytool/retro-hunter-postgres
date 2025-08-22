@@ -603,5 +603,5 @@ with tab_events:
 # Footer
 st.markdown("---")
 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.caption(f"🕵🏾‍♀️ Retro Hunter – powered by Veeam Data Integration API ({now}) - Version 2.2 PostgreSQL")
+st.caption(f"🕵🏾‍♀️ Retro Hunter – powered by Veeam Data Integration API ({now}) - Version 2.3 PostgreSQL")
 st.caption("🤖 Some logic and optimizations were assisted using AI tools.")
