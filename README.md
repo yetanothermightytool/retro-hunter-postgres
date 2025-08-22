@@ -323,7 +323,7 @@ There is now a dedicated MCP Server as part of the Retro Hunter platform. The MC
 This allows an LLM to answer questions based on real evidence, not just general knowledge or guesses.
 ### API Access
 Once running, the server offers an OpenAPI/Swagger UI at https://your-host:8000/docs .
-You can explore and test all endpoints there.
+You can explore and test all endpoints there. The API key set in the .env file of the MCP server is required for authorization and queries.
 
 ## Version History
 - 2.3 (August 22 2025)
