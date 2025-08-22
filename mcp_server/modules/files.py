@@ -9,7 +9,6 @@ load_dotenv()
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
-
 def get_pg_conn():
    return psycopg2.connect(
        host=os.getenv("POSTGRES_HOST", "db"),
@@ -27,16 +26,9 @@ def get_kpis():
        cur.execute("""
            SELECT
                (SELECT COUNT(*) FROM files) AS total_files,
-               (SELECT COUNT(DISTINCT f.sha256)
-               FROM files f
-               JOIN malwarebazaar mb ON f.sha256 = mb.sha256) AS malware_hits,
-               (SELECT COUNT(DISTINCT f.sha256)
-               FROM files f
-               JOIN lolbas l ON f.sha256 = l.sha256) AS lolbas_hits,
-               (SELECT COUNT(DISTINCT f.path)
-               FROM files f
-               JOIN scan_findings s ON f.sha256 = s.sha256
-               WHERE LOWER(s.detection) LIKE '%yara%') AS yara_hits
+               (SELECT COUNT(*) FROM scan_findings WHERE LOWER(detection) LIKE '%malware%') AS malware_hits,
+               (SELECT COUNT(*) FROM scan_findings WHERE LOWER(detection) LIKE '%lolbas%') AS lolbas_hits,
+               (SELECT COUNT(*) FROM scan_findings WHERE LOWER(detection) LIKE '%yara%') AS yara_hits
        """)
        row = cur.fetchone()
        cur.close()
@@ -47,10 +39,10 @@ def get_kpis():
 
        return JSONResponse(content={
            "results": [{
-               "malware_hits": row[0],
-               "yara_hits": row[1],
+               "total_files": row[0]
+               "malware_hits": row[1],
                "lolbas_hits": row[2],
-               "total_files": row[3]
+               "yara_hits": row[3]
            }]
        })
 
@@ -146,4 +138,3 @@ def suspicious_pe_files(hostname: str = Query(None)):
 
 def register_modules(app):
    app.include_router(router)
-
