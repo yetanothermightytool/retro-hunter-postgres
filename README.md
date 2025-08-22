@@ -25,7 +25,8 @@ Retro Hunter is a lightweight Python-based toolkit that scans Veeam Backup & Rep
 - Optionally scans the Windows Eventlog for specific event-ids (Security/PowerShell)
 - Optionally scans specific Windows Registry Hives
 - Displays findings in a Streamlit dashboard
-- Uses PostgreSQL as the database
+- Uses PostgreSQL as the database. 
+- MCP service (Model Context Protocol) [Check here](#mcp-server-for-retro-hunter).  **🔴 NEW**
 
 ## 🚀 Quickstart (tl;dr)
 Run the setup script, and start scanning! Execute `setup.sh` with the path to your `malwarebazaar.csv` file to initialize the environment and databases. Once done, you can use `retro-hunter.py` to analyze mounted restore points for malware, LOLBAS, and YARA hits, or to index all executables and scripts. Finally, open the dashboard at https://<your-hostname>:8501 to explore the results.
@@ -49,7 +50,7 @@ A minimal Docker setup is provided to run the Streamlit dashboard and the Postgr
 ## 🛠️ Technical Details of the Scripts
 ## Version Information
 ~~~~
-Version: 2.2 (Aug 13 2025)
+Version: 2.3 (Aug 22 2025)
 Requires: Veeam Backup & Replication v12.3.1+ & Linux & Python 3.1+
 Author: Stephan "Steve" Herzig
 ~~~~
@@ -298,18 +299,33 @@ Cleanup only for a specific host
 ```
 
 ## Coming Soon
-- MCP Server (Model Context Protocol)
+- Many ideas. Possibly make it v13 ready.
 
 ## Possible improvements
 - Mark the scanned restore point as infected in Veeam Backup & Replication.
 - And a few other nice things that I'm currently researching.
+- How about Vectordatabase stuff?
 
 ## Considerations and Limitations
 - The scripts have been created and tested on Ubuntu 24.04 and Veeam Backup & Replication 12.3.1 and 12.3.2
 - Only filesystems with the NTFS can be scanned when presenting the restore points using iSCSI
 - When mounting NTFS disks, it’s important to know that Ubuntu (from version 24.04 and newer) uses the built-in ntfs3 kernel driver, which provides better performance and more stable access. In contrast, Rocky Linux and other RHEL-based systems usually rely on the older ntfs-3g driver through FUSE, which is slower because it runs in user space. This means that the way NTFS is handled can vary depending on the system. It is technically possible to upgrade Rocky Linux to a newer Kernel (5.15 or higher) to support the native ntfs3 driver. Mounting NTFS volumes works well when using the -t ntfs parameter, especially with iSCSI attached disks. FUSE is not working and there are currently no efforts to conduct further research in this area.
 
+## MCP Server for Retro Hunter
+There is now a dedicated MCP Server as part of the Retro Hunter platform. The MCP (Model Context Protocol) Server bridges large language models (LLMs) and real system data collected by Retro Hunter. It exposes a clean and secure HTTP API that allows an LLM to query the data collected by Retro Hunter:
+- Recent scan findings
+- Suspicious files and executables
+- Security-related Windows event logs
+- File KPIs and threat hits (e.g., YARA, LOLBAS, MalwareBazaar)
+
+This allows an LLM to answer questions based on real evidence, not just general knowledge or guesses.
+### API Access
+Once running, the server offers an OpenAPI/Swagger UI at https://<your-mcp-host>:8000/docs
+You can explore and test all endpoints there.
+
 ## Version History
+- 2.3 (August 22 2025)
+   - MCP Server based on FastAPI
 - 2.2 (August 13 2025)
    - Streamlit Dashboard cleanup. No error messages when a table does not exist (script did not run)
    - Streamlit Dashboard now has tabs for a better UI experience (tested on Streamlit 1.48.0)
