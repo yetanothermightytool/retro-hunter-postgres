@@ -39,7 +39,7 @@ def get_kpis():
 
        return JSONResponse(content={
            "results": [{
-               "total_files": row[0]
+               "total_files": row[0],
                "malware_hits": row[1],
                "lolbas_hits": row[2],
                "yara_hits": row[3]
