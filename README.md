@@ -24,7 +24,7 @@ Retro Hunter is a lightweight Python-based toolkit that scans Veeam Backup & Rep
 - Optionally applies YARA rules to selected file types during scan
 - Optionally scans the Windows Eventlog for specific event-ids (Security/PowerShell)
 - Optionally scans specific Windows Registry Hives
-- Displays findings in a Streamlit dashboard
+- Displays findings in a Streamlit dashboard  **🔴 Enhanced in v2.2**
 - Uses PostgreSQL as the database. 
 - MCP service (Model Context Protocol) [Check here](#mcp-server-for-retro-hunter).  **🔴 NEW**
 
@@ -322,7 +322,7 @@ There is now a dedicated MCP Server as part of the Retro Hunter platform. The MC
 
 This allows an LLM to answer questions based on real evidence, not just general knowledge or guesses.
 ### API Access
-Once running, the server offers an OpenAPI/Swagger UI at https://your-host:8000/docs
+Once running, the server offers an OpenAPI/Swagger UI at https://your-host:8000/docs .
 You can explore and test all endpoints there.
 
 ## Version History
