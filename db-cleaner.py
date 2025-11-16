@@ -91,6 +91,7 @@ def cleanup():
        delete_from_table(cur, "files", "rp_timestamp", cutoff, args.host)
        delete_from_table(cur, "scan_findings", "rp_timestamp", cutoff, args.host)
        delete_from_table(cur, "win_events", "rp_timestamp", cutoff, args.host)
+       delete_from_table(cur, "registry_scan", "rp_timestamp", cutoff, args.host)
 
    if not args.dry_run:
        conn.commit()
