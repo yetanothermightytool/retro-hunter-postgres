@@ -90,7 +90,7 @@ EOF
 chmod 600 .env .env.local
 echo "✅ .env and .env.local created (secure)."
 
-# START DATABASE CONTAINER
+# START PostgreSQL CONTAINER
 echo "🐘 Starting PostgreSQL container..."
 sudo docker compose -f docker-compose.yml up -d db
 
@@ -118,12 +118,18 @@ sed -i "s|__REPLACE_VBR_SERVER__|$VBR_SERVER|g" retro-hunter.py
 sed -i "s|__REPLACE_REST_API_USER__|$REST_USER|g" retro-hunter.py
 echo "✅ Patched retro-hunter.py"
 
+sed -i "s|__REPLACE_VBR_SERVER__|$VBR_SERVER|g" nas-scanner.py
+sed -i "s|__REPLACE_REST_API_USER__|$REST_USER|g" nas-scanner.py
+echo "✅ Patched nas-scanner.py"
+
+
 # Make retro-hunter.py and the other tools executable
 chmod +x retro-hunter.py
 chmod +x registry-analyzer.py
 chmod +x import_malwarebazaar.py
 chmod +x db-cleaner.py
 chmod +x get-malware-csv.py
+chmod +x nas-scanner.py
 echo "🎸 retro-hunter.py & the other mighty tools are ready to rock!"
 
 # CREATE FERNET FILES
@@ -131,7 +137,7 @@ echo "🔐 Generating Fernet key files..."
 cp fernet/create-fernet-files.py . || { echo "❌ Missing create-fernet-files.py"; exit 1; }
 python3 create-fernet-files.py || { echo "❌ Fernet key generation failed"; exit 1; }
 rm -rf fernet/
-echo "✅ Fernet key generated."
+echo "✅ Fernet files generated."
 
 # === Generate self-signed SSL certificate for Streamlit ===
 echo "🔐 Generating self-signed SSL certificate for Streamlit..."
@@ -170,4 +176,3 @@ rm -f import_lolbas.py lolbin.csv malwarebazaar.csv create-fernet-files.py
 rm -rf Images
 
 echo "✅ Setup complete!"
-
