@@ -23,8 +23,9 @@ Retro Hunter is a lightweight Python-based toolkit that scans Veeam Backup & Rep
 - Identifies out-of-place LOLBAS (Living Off the Land Binaries and Scripts)
 - Optionally applies YARA rules to selected file types during scan
 - Optionally scans the Windows Eventlog for specific event-ids (Security/PowerShell)
-- Optionally scans specific Windows Registry Hives
-- Displays findings in a Streamlit dashboard  **🔴 Enhanced in v2.2**
+- Optionally scans specific Windows Registry Hives **🔴 Enhanced in v2.3**
+- Displays findings in a Streamlit dashboard  
+- NAS AV Scan with all features from this [script](https://github.com/yetanothermightytool/python/blob/main/vbr/vbr-nas-av-scan/README.md) & YARA scan capabilities. Scan results visible in Streamlit dashboard **🔴 New in v2.3**
 - Uses PostgreSQL as the database. 
 
 
@@ -38,20 +39,20 @@ Run the setup script, and start scanning! Execute `setup.sh` with the path to yo
 Something missing? Check the [Coming Soon section](#coming-soon).
 
 ## ⚙️ Setup Process
-The setup process is simplified with the setup.sh script. You only need to download the malwarebazaar.csv file (See more in the [Technical Details of the Scripts](#database) and run the script on your Linux host. You will be asked for the Veeam Backup & Replication Server hostname, REST API user, and a password during the setup. The password will be securely encrypted and stored using Fernet.
+The setup process is simplified with the setup.sh script. You only need to download the malwarebazaar.csv file (See more in the [Technical Details of the Scripts](#database) and run the script on your Linux host. You will be asked for the Veeam Backup & Replication Server hostname, REST API user, and a password during the setup. The password will be securely encrypted and stored using Fernet. The script now also asks for the SMB password for the NAS Scanner **🔴 New in v2.3**
 
 ```bash
 ./setup.sh /path/to/malwarebazaar.csv retro-hunter
 ```
 
-## 🐳 Docker Support
+## 🐳 Docker Support**
 A minimal Docker setup is provided to run the Streamlit dashboard and the PostgreSQL database as a container.
 
 ## 🛠️ Technical Details of the Scripts
 ## Version Information
 ~~~~
-Version: 2.2 (Aug 13 2025)
-Requires: Veeam Backup & Replication v12.3.1+ & Linux & Python 3.1+
+Version: 2.3 (November 21 2025)
+Requires: Veeam Backup & Replication v12.3.2+ & Linux & Python 3.1+
 Author: Stephan "Steve" Herzig
 ~~~~
 
@@ -132,7 +133,7 @@ sudo ./retro-hunter.py --repo2scan "Repository 01" --yaramode suspicious --iscsi
 ```
 
 ## Retro Hunter Streamlit Dashboard
-✅ Overview Tab **🔴 NEW ** - Key Metrics (Top 5 KPIs)
+✅ Overview Tab - Key Metrics (Top 5 KPIs)
 | Metric  | Description |
 | ------------- | ------------- |
 | 🦠 Malware Matches  | Total number of files matching known malware hashes|
@@ -142,12 +143,14 @@ sudo ./retro-hunter.py --repo2scan "Repository 01" --yaramode suspicious --iscsi
 | 📁 Files per host | Shows how many files were found on each host |
 | 📁 Files over time | Shows how many files were found on each date |
 
-✅ Scans Tab **🔴 NEW **
+✅ Scans Tab
 | Metric  | Description |
 | ------------- | ------------- |
 | 🔍 Scan Findings | Results from YARA or LOLBAS scans. Includes detection labels, scan timestamps, and affected files |
+|  **🔴 NEW ** 📦 Unstructured Data Scan Findings | Results from YARA or AV scans. Includes detection labels, scan timestamps, and affected files |
 
-📊 Deep Analysis Tab **🔴 NEW **
+
+📊 Deep Analysis Tab 
 | Table  | Description |
 | ------------- | ------------- |
 | 💣 Large Executables > 50MB | Shows .exe files larger than 50MB, which may indicate suspicious payloads or packers |
@@ -155,11 +158,11 @@ sudo ./retro-hunter.py --repo2scan "Repository 01" --yaramode suspicious --iscsi
 | 📂 Scripts in Temp/Download Directories | Detects script files (e.g., .ps1, .sh, .bat) in temporary or download paths – often used for staging attacks |
 | 🌀 Multi-use Hashes (Same SHA256, multiple filenames) | Highlights SHA-256 hashes used with different filenames. May indicate renamed or disguised malware |
 | ⚙️ System Process Names Outside System32 | Known system process names (e.g., svchost.exe, lsass.exe) found outside trusted paths like System32. Strong indicator of abuse or masquerading |
-| 🧬 Suspicious IFEO Debuggers (Registry Scan) | Description coming soon|  **🔴 NEW** |
+| 🧬 Suspicious IFEO Debuggers (Registry Scan) | Description coming soon| 
 | 🧠 High Entropy Files in Suspicious Paths | Identifies files with high entropy (>7.5), indicating possible encryption or obfuscation, located in suspicious directories |
 | 🧬 High-Entropy Executables with Recent PE Timestamps | Executable files with high entropy (>= 7.59) and suspicious Portable Executable attributes|
 
-📊 Events Tab **🔴 NEW **
+📊 Events Tab
 | Table  | Description |
 | ------------- | ------------- |
 | 📑 Windows Event Log Entries | Parsed entries from Windows Event Log files (Security & PowerShell) for forensic and threat analysis |
@@ -268,13 +271,21 @@ These events are parsed, stored in the database, and visualized in the dashboard
 ## Registry scanner script details
 **coming soon**
 
+
+## NAS AV Scanner **🔴 NEW **
+Same script functionality and parameters as in this [script](https://github.com/yetanothermightytool/python/blob/main/vbr/vbr-nas-av-scan/README.md), except that the scan-engines.json also includes the path to YARA (needs to be installed first). The nas-scanner.py script must be run separately from the retro-hunter.py script. All findings are stored in the PostgreSQL database and visualized in the Scans tab of the Streamlit dashboard.
+
+## Retro Hunter Malware Bazaar CSV downloader **🔴 NEW **
+Simply run get-malware-csv.py
+
 ## Retro Hunter PostgreSQL Cleanup Script (db-cleaner.py)
 
 This script removes outdated entries from key PostgreSQL tables in your Retro Hunter environment:
 • files
 • scan_findings
 • win_events
-• registry (to be added)
+• registry  **🔴 NEW **
+• nas_scan_findings (to be added)
 
 ### Options
 
@@ -299,17 +310,16 @@ Cleanup only for a specific host
 ```
 
 ## Coming Soon
-- Many ideas. Possibly make it v13 ready.
-- Download the MalwareBazaar csv using a script.
+- Many ideas. Stay tuned
+
 
 ## Possible improvements
 - Mark the scanned restore point as infected in Veeam Backup & Replication.
 - And a few other nice things that I'm currently researching.
-- How about Vectordatabase stuff?
-- How about an ISO file with the OS and the setup script?
+- How about an ISO file with the OS and the setup script? (There is one ready to be used)
 
 ## Considerations and Limitations
-- The scripts have been created and tested on Ubuntu 24.04 and Veeam Backup & Replication 12.3.1 and 12.3.2
+- The scripts have been created and tested on Ubuntu 24.04 and Veeam Backup & Replication 12.3.1 and 12.3.2 and 13.0.1 (tests ongoing **🔴 NEW **)
 - Only filesystems with the NTFS can be scanned when presenting the restore points using iSCSI
 - When mounting NTFS disks, it’s important to know that Ubuntu (from version 24.04 and newer) uses the built-in ntfs3 kernel driver, which provides better performance and more stable access. In contrast, Rocky Linux and other RHEL-based systems usually rely on the older ntfs-3g driver through FUSE, which is slower because it runs in user space. This means that the way NTFS is handled can vary depending on the system. It is technically possible to upgrade Rocky Linux to a newer Kernel (5.15 or higher) to support the native ntfs3 driver. Mounting NTFS volumes works well when using the -t ntfs parameter, especially with iSCSI attached disks. FUSE is not working and there are currently no efforts to conduct further research in this area.
 
