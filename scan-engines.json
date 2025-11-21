@@ -1,0 +1,22 @@
+{
+ "engines": [
+   {
+     "name": "ClamAV",
+     "path": "/usr/bin/clamscan",
+     "params": ["--no-summary", "-i", "-r", "--log=/var/log/clamav/scan.log"],
+     "regex": "FOUND$"
+   },
+   {
+     "name": "Thor",
+     "path": "/opt/thor/thor-linux-64",
+     "params": ["-a", "FileScan", "--intense", "--threads", "-2", "--nothordb", "--alldrives", "-e", "/opt/thor/", "-p", "{path}"],
+     "regex": "^(Warning|Alert).*SCORE:|^FILE:\\s*(.+)|^REASON_.*:"
+   },
+   {
+     "name": "YARA",
+     "path": "/usr/bin/yara",
+     "params": ["-p", "8", "-r", "./yara_rules/yara.yar", "{path}"],
+     "regex": "^\\S+\\s+/.+$"
+   }
+ ]
+}
