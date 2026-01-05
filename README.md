@@ -22,8 +22,8 @@ Retro Hunter is a lightweight Python-based toolkit that scans Veeam Backup & Rep
 - Detects known malware using hash lookups from MalwareBazaar
 - Identifies out-of-place LOLBAS (Living Off the Land Binaries and Scripts)
 - Optionally applies YARA rules to selected file types during scan
-- Optionally scans the Windows Eventlog for specific event-ids (Security/PowerShell)
-- Optionally scans specific Windows Registry Hives **🔴 Enhanced in v2.3**
+- Optionally scans the Windows Eventlog for specific event-ids (Security/PowerShell/Sysmon) **🔴 Enhanced in v2.4**
+- Optionally scans specific Windows Registry Hives 
 - Displays findings in a Streamlit dashboard  
 - NAS AV Scan with all features from this [script](https://github.com/yetanothermightytool/python/blob/main/vbr/vbr-nas-av-scan/README.md) & YARA scan capabilities. Scan results visible in Streamlit dashboard **🔴 New in v2.3**
 - Uses PostgreSQL as the database. 
@@ -255,21 +255,32 @@ _(optional)_ Comma-separated list of folder names to skip
 - `--db`
 _(optional)_ SQLite DB path (default is file_index.db)
 
-## event-parser.py script  
+## event-parser.py script  **🔴 Enhanced in v2.4**
 The event-parser.py script extracts and analyzes security-related events from Windows event logs. It focuses on a defined set of Event IDs (Security & PowerShell Event Log) known to indicate potential threats, policy changes, or suspicious PowerShell usage.
 
 • Windows Security Event Ids (High Severity)
+The event-parser.py script extracts and analyzes security-related events from Windows event logs. It focuses on a defined set of Event IDs from the Windows Security and PowerShell event logs that are known to indicate potential threats, policy changes, or suspicious activity.
+• Windows Security Event IDs
 4618, 4649, 4719, 4765, 4766, 4794, 4897, 4964, 5124, 1102
-
-The list is based on official Microsoft recommendations [Microsoft: Events to Monitor](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/appendix-l--events-to-monitor).
-
-• PowerShell Events Ids
+The list is based on official Microsoft recommendations (Events to Monitor).
+• PowerShell Event IDs
 800, 4104
+• Sysmon Event IDs
+The script was extended to also support Sysmon events, allowing host-based telemetry such as process, network, file, and registry activity to be collected when Sysmon is available.
+1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 23, 25
 
+To parse multiple log sources, the script can be invoked with:
+
+```bash
+--evtlogs Security.evtx,Microsoft-Windows-Sysmon%4Operational.evtx,Microsoft-Windows-PowerShell%4Operational.evtx
+```
 These events are parsed, stored in the database, and visualized in the dashboard with severity classifications (High / Medium to High).
 
+
 ## Registry scanner script details
-**coming soon**
+The registry-scan.py script scans offline Windows Registry hives for security-relevant registry keys and values. It focuses on known persistence mechanisms, execution hijacking techniques, forensic artefacts, and configuration changes commonly used by malware, attackers, or administrative tools.
+
+The script parses the SYSTEM, SOFTWARE, and per-user NTUSER.DAT hives, matches keys against a predefined set of suspicious patterns (ASEPs, services, drivers, Winlogon, Run keys, Defender configuration, user activity, network artefacts).
 
 
 ## NAS AV Scanner **🔴 NEW **
@@ -324,6 +335,9 @@ Cleanup only for a specific host
 - When mounting NTFS disks, it’s important to know that Ubuntu (from version 24.04 and newer) uses the built-in ntfs3 kernel driver, which provides better performance and more stable access. In contrast, Rocky Linux and other RHEL-based systems usually rely on the older ntfs-3g driver through FUSE, which is slower because it runs in user space. This means that the way NTFS is handled can vary depending on the system. It is technically possible to upgrade Rocky Linux to a newer Kernel (5.15 or higher) to support the native ntfs3 driver. Mounting NTFS volumes works well when using the -t ntfs parameter, especially with iSCSI attached disks. FUSE is not working and there are currently no efforts to conduct further research in this area.
 
 ## Version History
+- 2.4 (January 5 2026)
+   - Event Parser: Added support for parsing Sysmon event logs
+   - Streamlit Dashboard fixes and Sysmon event listings
 - 2.3 (November 18 2025)
    - Windows Registry Scanner enhancements
    - NAS AV Scanner incl. results in the Scans tab
