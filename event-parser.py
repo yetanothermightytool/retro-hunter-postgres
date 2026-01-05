@@ -9,29 +9,77 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=".env.local")
 
-# Important Windows Event IDs
-DEFAULT_EVENT_IDS = [4618, 4649, 4719, 4765, 4766, 4794, 4897, 4964, 5124, 1102]
-# Extended: High-volume or optional events for deeper analysis
-# - 4688 / 4689 Process creation / termination
-# - 4104       PowerShell ScriptBlock logging (requires Script-Block Logging enabled)
-# - 8004 / 8007→ AppLocker Script Enforcement/Audit
-EXTENDED_EVENT_IDS = [4688, 4689,8004,8007]
-POWERSHELL_EVENT_IDS = [4104,800]
+# Logical event groups to simplify configuration and keep things extensible
+EVENT_GROUPS = {
+   # Windows Security – baseline (policy and important changes)
+   "security_core": [4618, 4649, 4719, 4765, 4766, 4794, 4897, 4964, 5124, 1102,],
+   # AppLocker
+   "applocker_core": [8004, 8007,],
+   # PowerShell – core logging 
+   "powershell_core": [4104, 800,],
+   # Sysmon – core telemetry (can be adjusted based on your Sysmon config)
+   "sysmon_core": [1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 23, 25,],
+   # Reserved for future telemetry 
+   "future_extended_telemetry": []
+}
+
+def _default_groups_for_logfile(logfile):
+  name = logfile.lower()
+  if "sysmon" in name:
+      return ["sysmon_core"]
+  if "powershell" in name:
+      return ["powershell_core"]
+  if "security" in name:
+      return ["security_core"]
+  # Fallback: no default groups 
+  return []
+
+def resolve_event_ids_for_logfile(logfile, args):
+  # Hard override via --event-ids
+  if args.event_ids:
+      return [int(e.strip()) for e in args.event_ids.split(",") if e.strip()]
+
+  groups = []
+
+  # Explicit logical groups via --event-groups
+  if args.event_groups:
+      groups.extend(g.strip() for g in args.event_groups.split(",") if g.strip())
+  else:
+      # Default groups based on logfile name
+      groups.extend(_default_groups_for_logfile(logfile))
+
+      # Optional: add extended Security process-related events
+      if args.extended and "security" in logfile.lower():
+          groups.append("security_process")
+          groups.append("applocker_core")
+  if not groups:
+      # No groups selected -> no event ID filter, parse everything
+      return None
+
+  event_ids = set()
+  for g in groups:
+      if g not in EVENT_GROUPS:
+          available = ", ".join(EVENT_GROUPS.keys())
+          raise ValueError(f"Unknown event group '{g}'. Available groups: {available}")
+      event_ids.update(EVENT_GROUPS[g])
+
+  return sorted(event_ids)
 
 def parse_args():
-   parser = argparse.ArgumentParser(description="Parse Windows EVTX logs into PostgreSQL")
-   parser.add_argument("--mount", required=True)
-   parser.add_argument("--hostname", required=True)
-   parser.add_argument("--restorepoint-id", required=True)
-   parser.add_argument("--rp-timestamp", required=True)
-   parser.add_argument("--rp-status", required=True)
-   parser.add_argument("--logfile", default="Security.evtx")
-   parser.add_argument("--event-ids")
-   parser.add_argument("--days", type=int)
-   parser.add_argument("--limit", type=int)
-   parser.add_argument("--verbose", action="store_true")
-   parser.add_argument("--extended", action="store_true",help="Include extended event IDs in addition to default IDs")
-   return parser.parse_args()
+  parser = argparse.ArgumentParser(description="Parse Windows EVTX logs into PostgreSQL")
+  parser.add_argument("--mount", required=True)
+  parser.add_argument("--hostname", required=True)
+  parser.add_argument("--restorepoint-id", required=True)
+  parser.add_argument("--rp-timestamp", required=True)
+  parser.add_argument("--rp-status", required=True)
+  parser.add_argument("--logfile", default="Security.evtx")
+  parser.add_argument("--event-ids", help="Comma-separated list of numeric event IDs (hard override, applies to all logfiles)")
+  parser.add_argument("--event-groups", help="Comma-separated logical event groups (e.g. security_core,sysmon_core)")
+  parser.add_argument("--days", type=int)
+  parser.add_argument("--limit", type=int)
+  parser.add_argument("--verbose", action="store_true")
+  parser.add_argument("--extended", action="store_true", help="Include extended Security event IDs in addition to the default IDs")
+  return parser.parse_args()
 
 def init_table(cur):
    cur.execute("""
@@ -144,15 +192,13 @@ def main():
      print(f"❌ EVTX not found: {evtx_path}")
      continue
 
-   if "PowerShell" in logfile:
-     used_ids = POWERSHELL_EVENT_IDS
-   else:
-     if args.event_ids:
-       used_ids = [int(e.strip()) for e in args.event_ids.split(",")]
-     elif args.extended:
-       used_ids = DEFAULT_EVENT_IDS + EXTENDED_EVENT_IDS
-     else:
-       used_ids = DEFAULT_EVENT_IDS
+   used_ids = resolve_event_ids_for_logfile(logfile, args)
+
+   if args.verbose:
+       if used_ids is None:
+           print(f"ℹ️ No event ID filter applied for {logfile} (processing all events).")
+       else:
+           print(f"ℹ️ Using {len(used_ids)} event IDs for {logfile}: {used_ids}")  
 
    parsed = parse_evtx(
      evtx_path,
