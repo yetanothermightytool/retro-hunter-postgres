@@ -97,8 +97,10 @@ def classify_event_severity(event_id: int) -> str:
     high_ids = {
         4104, 4618, 4649, 4719, 4765, 4766,
         4794, 4897, 4964, 5124,
+        # Sysmon Events
+        7, 8, 10, 12, 13, 22, 23, 25,
     }
-    medium_high_ids = {800, 1102}
+    medium_high_ids = {800, 1102, 1, 3, 11, 16}
     if event_id in high_ids:
         return "High"
     if event_id in medium_high_ids:
@@ -112,16 +114,22 @@ def pg_query(query: str) -> pd.DataFrame:
         st.warning(f"❌ Query failed: {e}")
         return pd.DataFrame()
 
-def run_analysis_query(title: str, query: str):
-    try:
-        df = read_sql(query)
-        if df.empty:
-            st.info(f"No entries found for: {title}")
-        else:
-            st.markdown(f"#### {title}")
-            st.dataframe(df, use_container_width=True)
-    except Exception as e:
-        st.warning(f"❌ Query failed: {e}")
+def run_analysis_query(title: str, query: str, depends_on: list[str] = None):
+   if depends_on:
+       missing = [t for t in depends_on if not table_exists(t)]
+       if missing:
+           st.info(f"{title}: Table(s) not found – skipped")
+           return
+
+   try:
+       df = read_sql(query)
+       if df.empty:
+           st.info(f"No entries found for: {title}")
+       else:
+           st.markdown(f"#### {title}")
+           st.dataframe(df, use_container_width=True)
+   except Exception:
+       st.info(f"{title}: No data available")
 
 # Data loading functions
 def load_files() -> pd.DataFrame:
@@ -231,7 +239,8 @@ def load_eventlog_entries() -> pd.DataFrame:
         FROM win_events
         WHERE event_id IN (
             4104, 4618, 4649, 4719, 4765, 4766,
-            4794, 4897, 4964, 5124, 1102, 550, 800
+            4794, 4897, 4964, 5124, 1102, 550, 800,
+            1, 3, 7, 8, 10, 11, 12, 13, 16, 22, 23, 25
         )
         ORDER BY "Event Time" DESC
         LIMIT 100
@@ -598,7 +607,8 @@ with tab_analysis:
               ROUND(size / 1048576.0, 2) AS Size_MB
        FROM files
        WHERE filename LIKE '%%.exe' AND size > 52428800
-       """
+       """,
+       depends_on=["files"]
    )
 
    # ----------------------------------------------------------
@@ -612,7 +622,8 @@ with tab_analysis:
               path AS Path
        FROM files
        WHERE LOWER(path) LIKE '%%appdata%%' AND filename LIKE '%%.exe'
-       """
+       """,
+       depends_on=["files"]
    )
 
    # ----------------------------------------------------------
@@ -630,7 +641,8 @@ with tab_analysis:
            LOWER(path) LIKE '%%\\\\temp\\\\%%' OR
            LOWER(path) LIKE '%%\\\\downloads\\\\%%'
        )
-       """
+       """,
+       depends_on=["files"]
    )
 
    # ----------------------------------------------------------
@@ -650,7 +662,8 @@ with tab_analysis:
          AND LOWER(path) NOT LIKE '%%/recycle.bin/%%'
        GROUP BY sha256
        HAVING COUNT(DISTINCT filename) > 1
-       """
+       """,
+       depends_on=["files"]
    )
 
    # ----------------------------------------------------------
@@ -676,7 +689,8 @@ with tab_analysis:
            LOWER(path) LIKE '%%/windows/servicing/lcu/%%' OR
            LOWER(path) LIKE '%%/windows%%'
        )
-       """
+       """,
+       depends_on=["files"]
    )
 
    # ----------------------------------------------------------
@@ -694,7 +708,8 @@ with tab_analysis:
        WHERE entropy > 7.5 AND suspicious_structure = 'yes'
        ORDER BY entropy DESC
        LIMIT 100
-       """
+       """,
+       depends_on=["files"]
    )
 
    # ----------------------------------------------------------
@@ -838,5 +853,5 @@ with tab_events:
 # -------------------- Footer --------------------
 st.markdown("---")
 now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-st.caption(f"🕵🏾‍♀️ Retro Hunter – powered by Veeam Data Integration API ({now_str}) – Version-2.3 PostgreSQL")
+st.caption(f"🕵🏾‍♀️ Retro Hunter – powered by Veeam Data Integration API ({now_str}) – Version-2.4 PostgreSQL")
 st.caption("🤖 Some logic and optimizations were assisted using AI tools.")
